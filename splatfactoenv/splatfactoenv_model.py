@@ -1,29 +1,29 @@
 """
-Template Model File
+Splatfactoenv Model File
 
 Currently this subclasses the Nerfacto model. Consider subclassing from the base Model.
 """
 from dataclasses import dataclass, field
 from typing import Type
 
-from nerfstudio.models.nerfacto import NerfactoModel, NerfactoModelConfig  # for subclassing Nerfacto model
+# from nerfstudio.models.nerfacto import NerfactoModel, NerfactoModelConfig  # for subclassing Nerfacto model
 from nerfstudio.models.base_model import Model, ModelConfig  # for custom Model
-
+from nerfstudio.models.splatfacto import SplatfactoModel, SplatfactoModelConfig
 
 @dataclass
-class TemplateModelConfig(NerfactoModelConfig):
-    """Template Model Configuration.
+class SplatfactoEnvModelConfig(SplatfactoModelConfig):
+    """Splatfactoenv Model Configuration.
 
     Add your custom model config parameters here.
     """
 
-    _target: Type = field(default_factory=lambda: TemplateModel)
+    _target: Type = field(default_factory=lambda: SplatfactoEnvModel)
 
 
-class TemplateModel(NerfactoModel):
-    """Template Model."""
+class SplatfactoEnvModel(SplatfactoModel):
+    """Splatfactoenv Model."""
 
-    config: TemplateModelConfig
+    config: SplatfactoEnvModelConfig
 
     def populate_modules(self):
         super().populate_modules()

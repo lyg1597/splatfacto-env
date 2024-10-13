@@ -13,8 +13,8 @@ from nerfstudio.fields.nerfacto_field import NerfactoField  # for subclassing Ne
 from nerfstudio.fields.base_field import Field  # for custom Field
 
 
-class TemplateNerfField(NerfactoField):
-    """Template Field
+class SplatfactoenvField(NerfactoField):
+    """Splatfactoenv Field
 
     Args:
         aabb: parameters of scene aabb bounds
