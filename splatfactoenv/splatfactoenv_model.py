@@ -273,7 +273,7 @@ class SplatfactoEnvModel(Model):
             num_env_params=self.num_env_params,
             implementation='torch',
             sh_levels=self.config.sh_degree,
-            num_layers=6,
+            num_layers=5,
             layer_width=256,
         )
 
@@ -778,6 +778,9 @@ class SplatfactoEnvModel(Model):
             print("Called get_outputs with not a camera")
             return {}
 
+        # if camera.metadata is None:
+        #     camera.metadata = {"env_prams":torch.tensor([0.5,0.5])}
+
         if self.config.sh_degree > 0:
             sh_degree_to_use = min(self.step // self.config.sh_degree_interval, self.config.sh_degree)
 
@@ -812,7 +815,10 @@ class SplatfactoEnvModel(Model):
         else:
             render_mode = "RGB"
 
-        env_params = camera.metadata['env_params']
+        if camera.metadata is None:
+            env_params = torch.Tensor([0,0])
+        else:
+            env_params = camera.metadata['env_params']
         env_params_repeat = env_params.repeat(means.shape[0], 1).to(self.device)
 
         colors = self.color_nn(

@@ -37,7 +37,7 @@ class SplatfactoenvField(Field):
 
         self.encoder = MLP(
             in_dim=3+4+3,
-            num_layers=num_layers-1, 
+            num_layers=num_layers, 
             layer_width=layer_width,
             out_dim=layer_width, 
             activation=nn.ReLU(),
@@ -58,8 +58,8 @@ class SplatfactoenvField(Field):
         )
 
         self.sh_rest_head = MLP(
-            in_dim=self.encoder.out_dim,
-            num_layers=1, 
+            in_dim=self.encoder.out_dim+num_env_params,
+            num_layers=3, 
             layer_width=layer_width,
             out_dim=(self.sh_dim-1)*3,
             activation=nn.ReLU(),
@@ -80,6 +80,8 @@ class SplatfactoenvField(Field):
         base_color = self.sh_base_head(
             torch.cat((x, env_params), dim=1)
         )
-        sh_rest = self.sh_rest_head(x)
+        sh_rest = self.sh_rest_head(
+            torch.cat((x,env_params), dim=1)
+        )
         sh_coeffs = torch.cat((base_color, sh_rest), dim=1).view(-1, self.sh_dim, 3)
         return sh_coeffs
