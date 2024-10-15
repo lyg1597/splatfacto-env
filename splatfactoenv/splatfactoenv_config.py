@@ -10,11 +10,10 @@ from splatfactoenv.splatfactoenv_datamanager import (
     SplatfactoEnvDataManagerConfig,
 )
 from splatfactoenv.splatfactoenv_model import SplatfactoEnvModelConfig
-from splatfactoenv.splatfactoenv_pipeline import (
-    SplatfactoEnvPipelineConfig,
-)
+
 from nerfstudio.configs.base_config import ViewerConfig
 from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
+from splatfactoenv.splatfactoenv_dataparser import SplatfactoEnvDataParserConfig
 from nerfstudio.engine.optimizers import AdamOptimizerConfig, RAdamOptimizerConfig
 from nerfstudio.engine.schedulers import (
     ExponentialDecaySchedulerConfig,
@@ -27,7 +26,7 @@ from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
 
 splatfactoenv = MethodSpecification(
     config=TrainerConfig(
-        method_name="splatfacto",
+        method_name="splatfacto-env",
         steps_per_eval_image=100,
         steps_per_eval_batch=0,
         steps_per_save=2000,
@@ -35,8 +34,8 @@ splatfactoenv = MethodSpecification(
         max_num_iterations=30000,
         mixed_precision=False,
         pipeline=VanillaPipelineConfig(
-            datamanager=FullImageDatamanagerConfig(
-                dataparser=NerfstudioDataParserConfig(load_3D_points=True),
+            datamanager=SplatfactoEnvDataManagerConfig(
+                dataparser=SplatfactoEnvDataParserConfig(load_3D_points=True),
                 cache_images_type="uint8",
             ),
             model=SplatfactoEnvModelConfig(),
@@ -49,13 +48,23 @@ splatfactoenv = MethodSpecification(
                     max_steps=30000,
                 ),
             },
-            "features_dc": {
-                "optimizer": AdamOptimizerConfig(lr=0.0025, eps=1e-15),
-                "scheduler": None,
+            "appearance_model_encoder": {
+                "optimizer": AdamOptimizerConfig(lr=2e-3, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-4, max_steps=30000
+                ),
             },
-            "features_rest": {
-                "optimizer": AdamOptimizerConfig(lr=0.0025 / 20, eps=1e-15),
-                "scheduler": None,
+            "appearance_model_base": {
+                "optimizer": AdamOptimizerConfig(lr=2e-3, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-4, max_steps=30000
+                ),
+            },
+            "appearance_model_rest": {
+                "optimizer": AdamOptimizerConfig(lr=2e-3 / 20, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-4 / 20, max_steps=30000
+                ),
             },
             "opacities": {
                 "optimizer": AdamOptimizerConfig(lr=0.05, eps=1e-15),

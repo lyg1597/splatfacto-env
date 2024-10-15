@@ -6,14 +6,16 @@ Currently this subclasses the NerfactoField. Consider subclassing the base Field
 
 from typing import Literal, Optional
 
-from torch import Tensor
+import torch 
+from torch import Tensor, nn
 
 from nerfstudio.field_components.spatial_distortions import SpatialDistortion
 from nerfstudio.fields.nerfacto_field import NerfactoField  # for subclassing NerfactoField
 from nerfstudio.fields.base_field import Field  # for custom Field
+from nerfstudio.field_components import MLP
 
 
-class SplatfactoenvField(NerfactoField):
+class SplatfactoenvField(Field):
     """Splatfactoenv Field
 
     Args:
@@ -21,14 +23,63 @@ class SplatfactoenvField(NerfactoField):
         num_images: number of images in the dataset
     """
 
-    aabb: Tensor
+    # aabb: Tensor
 
     def __init__(
         self,
-        aabb: Tensor,
-        num_images: int,
+        num_env_params: int, 
+        implementation: Literal["tcnn", "torch"] = "torch",
+        sh_levels: int = 4,
+        num_layers: int = 3,
+        layer_width: int = 256,
     ) -> None:
-        super().__init__(aabb=aabb, num_images=num_images)
+        super().__init__()
 
-    # TODO: Override any potential methods to implement your own field.
-    # or subclass from base Field and define all mandatory methods.
+        self.encoder = MLP(
+            in_dim=3+4+3,
+            num_layers=num_layers-1, 
+            layer_width=layer_width,
+            out_dim=layer_width, 
+            activation=nn.ReLU(),
+            out_activation=nn.ReLU(),
+            implementation= implementation
+        )
+
+        self.sh_dim = (sh_levels+1)**2
+
+        self.sh_base_head = MLP(
+            in_dim=self.encoder.out_dim+num_env_params,
+            num_layers=3,
+            layer_width=layer_width,
+            out_dim=3,
+            activation=nn.ReLU(),
+            out_activation=nn.ReLU(),
+            implementation=implementation
+        )
+
+        self.sh_rest_head = MLP(
+            in_dim=self.encoder.out_dim,
+            num_layers=1, 
+            layer_width=layer_width,
+            out_dim=(self.sh_dim-1)*3,
+            activation=nn.ReLU(),
+            out_activation=None,
+            implementation=implementation
+        )
+
+    def forward(
+        self,
+        mean,
+        quat,
+        scale,
+        env_params
+    ) -> Tensor:
+        x = self.encoder(
+            torch.cat((mean, quat, scale), dim=1)
+        ).float()
+        base_color = self.sh_base_head(
+            torch.cat((x, env_params), dim=1)
+        )
+        sh_rest = self.sh_rest_head(x)
+        sh_coeffs = torch.cat((base_color, sh_rest), dim=1).view(-1, self.sh_dim, 3)
+        return sh_coeffs
