@@ -816,7 +816,7 @@ class SplatfactoEnvModel(Model):
             render_mode = "RGB"
 
         if camera.metadata is None:
-            env_params = torch.Tensor([0,0])
+            env_params = torch.Tensor([0.5,0.5])
         else:
             env_params = camera.metadata['env_params']
         env_params_repeat = env_params.repeat(means.shape[0], 1).to(self.device)
