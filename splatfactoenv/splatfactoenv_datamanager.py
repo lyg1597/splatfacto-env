@@ -16,7 +16,7 @@ from nerfstudio.configs.dataparser_configs import AnnotatedDataParserUnion
 # from splatfactoenv.splatfactoenv_model import SplatfactoModel
 from splatfactoenv.splatfactoenv_dataparser import SplatfactoEnvDataParserConfig, SplatfactoEnvDataParser
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig, FullImageDatamanager
-
+import copy 
 
 @dataclass
 class SplatfactoEnvDataManagerConfig(FullImageDatamanagerConfig):
@@ -88,7 +88,7 @@ class SplatfactoenvDataManager(FullImageDatamanager):
         if len(self.train_unseen_cameras) == 0:
             self.train_unseen_cameras = self.sample_train_cameras()
 
-        data = self.cached_train[image_idx]
+        data = copy.deepcopy(self.cached_train[image_idx])
         data["image"] = data["image"].to(self.device)
 
         assert len(self.train_cameras.shape) == 1, "Assumes single batch dimension"

@@ -31,6 +31,8 @@ class SplatfactoenvField(Field):
         implementation: Literal["tcnn", "torch"] = "torch",
         sh_levels: int = 4,
         num_layers: int = 3,
+        num_sh_base_layers: int = 3,
+        num_sh_rest_layers = 3,
         layer_width: int = 256,
     ) -> None:
         super().__init__()
@@ -49,7 +51,7 @@ class SplatfactoenvField(Field):
 
         self.sh_base_head = MLP(
             in_dim=self.encoder.out_dim+num_env_params,
-            num_layers=3,
+            num_layers=num_sh_base_layers,
             layer_width=layer_width,
             out_dim=3,
             activation=nn.ReLU(),
@@ -59,7 +61,7 @@ class SplatfactoenvField(Field):
 
         self.sh_rest_head = MLP(
             in_dim=self.encoder.out_dim+num_env_params,
-            num_layers=3, 
+            num_layers=num_sh_rest_layers, 
             layer_width=layer_width,
             out_dim=(self.sh_dim-1)*3,
             activation=nn.ReLU(),
