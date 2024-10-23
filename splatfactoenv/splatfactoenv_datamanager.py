@@ -17,6 +17,9 @@ from nerfstudio.configs.dataparser_configs import AnnotatedDataParserUnion
 from splatfactoenv.splatfactoenv_dataparser import SplatfactoEnvDataParserConfig, SplatfactoEnvDataParser
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig, FullImageDatamanager
 import copy 
+from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
+
+CustomDataParserUnion = Union[SplatfactoEnvDataParserConfig, AnnotatedDataParserUnion]
 
 @dataclass
 class SplatfactoEnvDataManagerConfig(FullImageDatamanagerConfig):
@@ -26,7 +29,8 @@ class SplatfactoEnvDataManagerConfig(FullImageDatamanagerConfig):
     """
 
     _target: Type = field(default_factory=lambda: SplatfactoenvDataManager)
-    dataparser: AnnotatedDataParserUnion = field(default_factory=SplatfactoEnvDataParserConfig)
+    dataparser: CustomDataParserUnion  = field(default_factory=SplatfactoEnvDataParserConfig)
+    # dataparser: AnnotatedDataParserUnion  = field(default_factory=NerfstudioDataParserConfig)
     camera_res_scale_factor: float = 1.0
     """The scale factor for scaling spatial data such as images, mask, semantics
     along with relevant information about camera intrinsics

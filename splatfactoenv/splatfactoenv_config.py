@@ -12,8 +12,8 @@ from splatfactoenv.splatfactoenv_datamanager import (
 from splatfactoenv.splatfactoenv_model import SplatfactoEnvModelConfig
 
 from nerfstudio.configs.base_config import ViewerConfig
-from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
 from splatfactoenv.splatfactoenv_dataparser import SplatfactoEnvDataParserConfig
+from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
 from nerfstudio.engine.optimizers import AdamOptimizerConfig, RAdamOptimizerConfig
 from nerfstudio.engine.schedulers import (
     ExponentialDecaySchedulerConfig,
