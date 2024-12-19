@@ -17,7 +17,7 @@ from nerfstudio.models.splatfacto import SplatfactoModel, SplatfactoModelConfig
 from nerfstudio.cameras.camera_optimizers import CameraOptimizer, CameraOptimizerConfig
 from nerfstudio.utils.colors import get_color
 from nerfstudio.data.scene_box import OrientedBox
-from splatfactoenv.splatfactoenv_field import SplatfactoenvField
+from splatfactoenv.splatfactoenv_field import SplatfactoenvField,SplatfactoenvRGBField
 from nerfstudio.utils.rich_utils import CONSOLE
 from torch.nn import Parameter
 from nerfstudio.cameras.cameras import Cameras
@@ -189,6 +189,10 @@ class SplatfactoEnvModelConfig(ModelConfig):
     """Whether to use the average appearance embedding or 0-th for evaluation"""
     eval_right_half: bool = False
     """Whether to use the right half of the image for evluation"""
+    use_sh:bool = True
+    """Whether to use sh encoding or not"""
+    channel_num:int = 3
+    """If use use_sh is false, provide the number of channel of features to be rendered"""
 
 class SplatfactoEnvModel(Model):
     """Splatfactoenv Model."""
@@ -269,13 +273,22 @@ class SplatfactoEnvModel(Model):
         else:
             self.background_color = get_color(self.config.background_color)
 
-        self.color_nn = SplatfactoenvField(
-            num_env_params=self.num_env_params,
-            implementation='torch',
-            sh_levels=self.config.sh_degree,
-            num_layers=5,
-            layer_width=256,
-        )
+        if self.config.use_sh:
+            self.color_nn = SplatfactoenvField(
+                num_env_params=self.num_env_params,
+                implementation='torch',
+                sh_levels=self.config.sh_degree,
+                num_layers=5,
+                layer_width=256,
+            )
+        else:
+            self.color_nn = SplatfactoenvRGBField(
+                num_env_params = self.num_env_params,
+                implementation='torch',
+                feature_channel=self.config.channel_num,
+                num_layers = 5,
+                layer_width = 256
+            )
 
     def set_camera_idx(self, cam_idx: int):
         self.camera_idx = cam_idx
@@ -713,9 +726,13 @@ class SplatfactoEnvModel(Model):
         self.camera_optimizer.get_param_groups(param_groups=gps)
         assert self.color_nn is not None
         # assert self.appearance_embeds is not None
-        gps["appearance_model_encoder"] = list(self.color_nn.encoder.parameters())
-        gps["appearance_model_base"] = list(self.color_nn.sh_base_head.parameters())
-        gps["appearance_model_rest"] = list(self.color_nn.sh_rest_head.parameters())
+        if self.config.use_sh:
+            gps["appearance_model_encoder"] = list(self.color_nn.encoder.parameters())
+            gps["appearance_model_base"] = list(self.color_nn.sh_base_head.parameters())
+            gps["appearance_model_rest"] = list(self.color_nn.sh_rest_head.parameters())
+        else:
+            gps["appearance_model_encoder"] = list(self.color_nn.encoder.parameters())
+            gps["appearance_model_rgb"] = list(self.color_nn.rgb_head.parameters())
         return gps
 
     def _get_downscale_factor(self):
@@ -764,7 +781,7 @@ class SplatfactoEnvModel(Model):
             raise ValueError(f"Unknown background color {self.config.background_color}")
         return background
 
-    def get_outputs(self, camera: Cameras) -> Dict[str, Union[torch.Tensor, List]]:
+    def get_outputs(self, camera: Cameras, debug = False) -> Dict[str, Union[torch.Tensor, List]]:
         """Takes in a Ray Bundle and returns a dictionary of outputs.
 
         Args:
@@ -785,7 +802,9 @@ class SplatfactoEnvModel(Model):
             sh_degree_to_use = min(self.step // self.config.sh_degree_interval, self.config.sh_degree)
 
         if self.training:
-            assert camera.shape[0] == 1, "Only one camera at a time"
+            # if not camera.shape[0] == 1:
+            #     print(">>>>>>>>>>>", camera.shape[0])
+            assert camera.shape[0] == 1, f"Only one camera at a time, received {camera.shape}"
             optimized_camera_to_world = self.camera_optimizer.apply_to_camera(camera)
         else:
             optimized_camera_to_world = camera.camera_to_worlds
@@ -828,28 +847,53 @@ class SplatfactoEnvModel(Model):
             env_params_repeat
         )
 
-        render, alpha, info = rasterization(
-            means=means,
-            quats=quats / quats.norm(dim=-1, keepdim=True),
-            scales=torch.exp(scales),
-            opacities=torch.sigmoid(opacities).squeeze(-1),
-            colors=colors,
-            viewmats=viewmat,  # [1, 4, 4]
-            Ks=K,  # [1, 3, 3]
-            width=W,
-            height=H,
-            tile_size=BLOCK_WIDTH,
-            packed=False,
-            near_plane=0.01,
-            far_plane=1e10,
-            render_mode=render_mode,
-            sh_degree=sh_degree_to_use,
-            sparse_grad=False,
-            absgrad=True,
-            rasterize_mode=self.config.rasterize_mode,
-            # set some threshold to disregrad small gaussians for faster rendering.
-            # radius_clip=3.0,
-        )
+        if self.config.use_sh:
+            render, alpha, info = rasterization(
+                means=means,
+                quats=quats / quats.norm(dim=-1, keepdim=True),
+                scales=torch.exp(scales),
+                opacities=torch.sigmoid(opacities).squeeze(-1),
+                colors=colors,
+                viewmats=viewmat,  # [1, 4, 4]
+                Ks=K,  # [1, 3, 3]
+                width=W,
+                height=H,
+                tile_size=BLOCK_WIDTH,
+                packed=False,
+                near_plane=0.01,
+                far_plane=1e10,
+                render_mode=render_mode,
+                sh_degree=sh_degree_to_use,
+                sparse_grad=False,
+                absgrad=True,
+                rasterize_mode=self.config.rasterize_mode,
+                # set some threshold to disregrad small gaussians for faster rendering.
+                # radius_clip=3.0,
+            )
+        else:
+            render, alpha, info = rasterization(
+                means=means,
+                quats=quats / quats.norm(dim=-1, keepdim=True),
+                scales=torch.exp(scales),
+                opacities=torch.sigmoid(opacities).squeeze(-1),
+                colors=colors,
+                viewmats=viewmat,  # [1, 4, 4]
+                Ks=K,  # [1, 3, 3]
+                width=W,
+                height=H,
+                tile_size=BLOCK_WIDTH,
+                packed=False,
+                near_plane=0.01,
+                far_plane=1e10,
+                render_mode=render_mode,
+                sh_degree=None,
+                sparse_grad=False,
+                absgrad=True,
+                rasterize_mode=self.config.rasterize_mode,
+                # set some threshold to disregrad small gaussians for faster rendering.
+                # radius_clip=3.0,
+            )    
+
         if self.training and info["means2d"].requires_grad:
             info["means2d"].retain_grad()
         self.xys = info["means2d"]  # [1, N, 2]
@@ -870,13 +914,40 @@ class SplatfactoEnvModel(Model):
 
         if background.shape[0] == 3 and not self.training:
             background = background.expand(H, W, 3)
-
-        return {
-            "rgb": rgb.squeeze(0),  # type: ignore
-            "depth": depth_im,  # type: ignore
-            "accumulation": alpha.squeeze(0),  # type: ignore
-            "background": background,  # type: ignore
-        }  # type: ignore
+        
+        if not debug:
+            return {
+                "rgb": rgb.squeeze(0),  # type: ignore
+                "depth": depth_im,  # type: ignore
+                "accumulation": alpha.squeeze(0),  # type: ignore
+                "background": background,  # type: ignore
+            }  # type: ignore
+        else:
+            return {
+                "rgb": rgb.squeeze(0),  # type: ignore
+                "depth": depth_im,  # type: ignore
+                "accumulation": alpha.squeeze(0),  # type: ignore
+                "background": background,  # type: ignore
+            }, colors, {
+                "means":means,
+                "quats":quats / quats.norm(dim=-1, keepdim=True),
+                "scales":torch.exp(scales),
+                "opacities":torch.sigmoid(opacities).squeeze(-1),
+                "colors":colors,
+                "viewmats":viewmat,  # [1, 4, 4]
+                "Ks":K,  # [1, 3, 3]
+                "width":W,
+                "height":H,
+                "tile_size":BLOCK_WIDTH,
+                "packed":False,
+                "near_plane":0.01,
+                "far_plane":1e10,
+                "render_mode":render_mode,
+                "sh_degree":sh_degree_to_use,
+                "sparse_grad":False,
+                "absgrad":True,
+                "rasterize_mode":self.config.rasterize_mode,
+            }
     
     def get_gt_img(self, image: torch.Tensor):
         """Compute groundtruth image with iteration dependent downscale factor for evaluation purpose
